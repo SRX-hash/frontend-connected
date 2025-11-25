@@ -160,12 +160,12 @@ export const SearchPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
         {/* Results Count - Only show if we have search criteria */}
         {!isLoading && fabrics.length > 0 && (
-          <div className="mb-6 flex items-center justify-between animate-fade-in">
-               <div className="text-sm text-neutral-500 font-medium">
+        <div className="mb-6 flex items-center justify-between animate-fade-in">
+             <div className="text-sm text-neutral-500 font-medium">
                   Showing <span className="text-neutral-900 font-bold">{fabrics.length}</span> of <span className="text-neutral-900 font-bold">{totalResults}</span> results
-               </div>
-               {/* Sort option could go here */}
-          </div>
+             </div>
+             {/* Sort option could go here */}
+        </div>
         )}
 
         {/* Loading State (Initial) */}
@@ -176,19 +176,19 @@ export const SearchPage: React.FC = () => {
           </div>
         ) : fabrics.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">
               {fabrics.map((fabric, index) => {
                 const fabricId = fabric.ref || fabric.id;
                 return (
                   <div key={`${fabricId}-${index}`} className="h-full" style={{ animationDelay: `${(index % 20) * 50}ms` }}>
-                      <SearchFabricCard 
-                          fabric={fabric}
+                    <SearchFabricCard 
+                        fabric={fabric}
                           isSelected={!!selectedFabrics.find(f => (f.ref || f.id) === fabricId)}
-                          onToggleSelect={toggleSelection}
-                          onOpenMockup={setMockupModalFabric}
-                          onOpenTechpack={setTechpackModalFabric}
-                      />
-                  </div>
+                        onToggleSelect={toggleSelection}
+                        onOpenMockup={setMockupModalFabric}
+                        onOpenTechpack={setTechpackModalFabric}
+                    />
+                </div>
                 );
               })}
               </div>
@@ -209,7 +209,7 @@ export const SearchPage: React.FC = () => {
                       <>Load More Fabrics <ArrowRight size={16} className="ml-2" /></>
                     )}
                   </button>
-                </div>
+            </div>
               )}
             </>
         ) : (
@@ -260,50 +260,50 @@ export const SearchPage: React.FC = () => {
               } else {
                 // No results found for search criteria
                 return (
-                  <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-dashed border-neutral-300 text-center px-4 animate-fade-in shadow-sm">
-                    <div className="bg-neutral-50 p-6 rounded-full mb-6 shadow-inner">
-                      <SearchX className="h-12 w-12 text-neutral-400" />
-                    </div>
-                    <h3 className="text-2xl font-extrabold text-neutral-900 mb-3">No fabrics found</h3>
-                    <p className="text-neutral-500 mb-8 max-w-md mx-auto text-lg font-light">
+            <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-dashed border-neutral-300 text-center px-4 animate-fade-in shadow-sm">
+                <div className="bg-neutral-50 p-6 rounded-full mb-6 shadow-inner">
+                    <SearchX className="h-12 w-12 text-neutral-400" />
+                </div>
+                <h3 className="text-2xl font-extrabold text-neutral-900 mb-3">No fabrics found</h3>
+                <p className="text-neutral-500 mb-8 max-w-md mx-auto text-lg font-light">
                       {searchTerm ? (
                         <>We couldn't find any fabrics matching <span className="font-semibold text-neutral-700">"{searchTerm}"</span> with the current filters.</>
                       ) : (
                         <>No fabrics match your current filter selection. Try adjusting your filters.</>
                       )}
-                    </p>
-                    
-                    <button 
-                      onClick={resetAllFilters}
-                      className="bg-primary-600 text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center"
-                    >
+                </p>
+                
+                <button 
+                    onClick={resetAllFilters}
+                    className="bg-primary-600 text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center"
+                >
                       Clear Filters & Try Again <ArrowRight size={18} className="ml-2" />
-                    </button>
+                </button>
 
-                    <div className="mt-10">
-                      <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">Or try a popular category</p>
-                      <div className="flex flex-wrap justify-center gap-3">
+                <div className="mt-10">
+                    <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">Or try a popular category</p>
+                    <div className="flex flex-wrap justify-center gap-3">
                         <button 
-                          onClick={() => applyQuickFilter('fabrication', 'Single Jersey')}
-                          className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                            onClick={() => applyQuickFilter('fabrication', 'Single Jersey')}
+                            className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                         >
-                          Single Jersey
+                            Single Jersey
                         </button>
                         <button 
-                          onClick={() => applyQuickFilter('fabrication', 'Fleece')}
-                          className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                            onClick={() => applyQuickFilter('fabrication', 'Fleece')}
+                            className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                         >
-                          Fleece
+                            Fleece
                         </button>
                         <button 
                           onClick={() => applyQuickFilter('fabrication', 'Pique')}
-                          className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                            className="px-4 py-2 bg-white border border-neutral-200 rounded-full text-sm font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-600 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                         >
                           Pique
                         </button>
-                      </div>
                     </div>
-                  </div>
+                </div>
+            </div>
                 );
               }
             })()

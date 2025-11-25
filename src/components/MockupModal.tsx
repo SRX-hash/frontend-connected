@@ -306,12 +306,12 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                                 ) : (
                                   <Shirt size={40} className="text-[#111827]/30" />
                                 )}
-                              </div>
+                    </div>
                               {/* Item name below */}
                               <p className="text-xs font-medium text-[#111827] text-center">
                                 {garment.displayName}
                               </p>
-                            </div>
+                </div>
 
                             {/* Hover effect - green glow */}
                             <div 
@@ -333,7 +333,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                         <p className="text-[#111827]/70 font-medium">No garments available in this category</p>
                       </div>
                     )}
-                  </div>
+                </div>
                 </>
               )}
 
@@ -348,7 +348,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                       <ArrowLeft size={16} className="mr-1" />
                       Back to Selection
                     </button>
-                  </div>
+            </div>
 
                   {/* Mockup Preview Area */}
                   <div className="flex-1 flex items-center justify-center p-8 pt-4 min-h-[400px] overflow-auto">
@@ -439,7 +439,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                                 </button>
                               )}
                               {mockupData.views.includes('back') && (
-                                <button
+                <button 
                                   onClick={() => setCurrentView('back')}
                                   className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                                     currentView === 'back'
@@ -473,7 +473,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                                   color: '#111827',
                                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
                                 }}
-                              >
+                >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
@@ -501,7 +501,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
                                 Download Back
-                              </button>
+                </button>
                             )}
                           </div>
                         )}
@@ -527,7 +527,7 @@ export const MockupModal: React.FC<MockupModalProps> = ({ fabric, isSelected, on
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                               </svg>
                               Download Mockup
-                            </button>
+                </button>
                           </div>
                         )}
                       </div>

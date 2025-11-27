@@ -115,7 +115,7 @@ export const HeroSection: React.FC = () => {
                     </div>
                     
                     {/* Floating Badge */}
-                    <div className="absolute bottom-6 right-6 bg-primary-500 dark:bg-primary-500/80 backdrop-blur-md text-white px-4 py-2 rounded-lg shadow-xl flex items-center text-sm font-bold animate-bounce duration-[2000ms] border border-primary-400 dark:border-primary-400/30">
+                    <div className="absolute bottom-6 right-6 bg-primary-500 dark:bg-primary-500/80 backdrop-blur-md text-white px-4 py-2 rounded-lg shadow-xl flex items-center text-sm font-bold animate-bounce-slow border border-primary-400 dark:border-primary-400/30">
                         <Layout size={16} className="mr-2" />
                         Moodboard Active
                     </div>

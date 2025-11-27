@@ -1,0 +1,37 @@
+# ============================================
+# SRX Fabric Library - Python Dependencies
+# ============================================
+
+# Configuration Management
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Web Framework
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0  # For reading Excel files
+
+# Image Processing
+Pillow>=10.0.0
+
+# PDF Generation
+reportlab>=4.0.0
+
+# PowerPoint Generation
+python-pptx>=0.6.21
+
+# Standard library modules (no installation needed):
+# - os
+# - sys
+# - json
+# - re
+# - glob
+# - io
+# - logging
+# - datetime
+# - pathlib
+

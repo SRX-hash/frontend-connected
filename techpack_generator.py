@@ -10,17 +10,15 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 
 # --- Configuration ---
-try:
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-    PATHS = config['paths']
-    COORDS = config['techpack_coords']
-except FileNotFoundError:
-    print("FATAL ERROR: config.json not found.", file=sys.stderr)
-    sys.exit(1)
-except json.JSONDecodeError:
-    print("FATAL ERROR: config.json is not valid JSON.", file=sys.stderr)
-    sys.exit(1)
+# Import settings from config.py (uses pydantic-settings with .env file)
+from config import settings
+
+# Use settings from environment variables
+PATHS = {
+    'pdf_output_dir': str(settings.pdf_output_dir_path),
+    'techpack_template_dir': str(settings.techpack_template_dir_path),
+}
+COORDS = settings.techpack_coords
 # ---------------------
 
 def calculate_pdf_box(
@@ -125,7 +123,7 @@ def run_generator():
         
         # --- 1. Find the correct techpack template ---
         template_filename = f"techpack_{mockup_name}.jpg"
-        template_path = os.path.join(PATHS['techpack_template_dir'], template_filename)
+        template_path = os.path.join(settings.techpack_template_dir_path, template_filename)
         
         if not os.path.exists(template_path):
             print(f"Error: Techpack template not found.", file=sys.stderr)

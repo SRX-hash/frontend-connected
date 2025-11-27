@@ -2,29 +2,32 @@
 Mockup Generator 2.0 - Command Line Interface
 Allows manual mockup generation from terminal
 
-V2.1 Update: Handles list output from generator
+V2.2 Update: Uses environment variables for configuration
 """
 
 import os
 import sys
 # Ensure new library is imported
 from mockup_library import MockupGeneratorV2
+# Import settings from config.py (uses pydantic-settings with .env file)
+from config import settings
 
 
 def main():
     """Interactive command-line mockup generator"""
     
     print("\n" + "="*60)
-    print("🎨 SRX MOCKUP GENERATOR 2.1")
+    print("🎨 SRX MOCKUP GENERATOR 2.2")
     print("   Stretch-to-Fit Fabric Application")
     print("   (Auto-detects face/back)")
+    print("   Configuration: Environment Variables (.env)")
     print("="*60 + "\n")
     
-    # Configuration
-    FABRIC_DIR = "fabrics"
-    MOCKUP_DIR = "mockups"
-    MASK_DIR = "masks"
-    OUTPUT_DIR = "generated_mockups"
+    # Use configuration from environment variables
+    FABRIC_DIR = str(settings.fabric_dir_path)
+    MOCKUP_DIR = str(settings.mockup_dir_path)
+    MASK_DIR = str(settings.mask_dir_path)
+    OUTPUT_DIR = str(settings.mockup_output_dir_path)
     
     # Initialize generator
     generator = MockupGeneratorV2(

@@ -1,8 +1,9 @@
 """
-Mockup Generator 2.0 - API Server v5.1
+Mockup Generator 2.0 - API Server v5.2
 - Updated for Google AI Studio Vibe Coding
 - CORS enabled for VS Code Tunneling
 - Fixed Image Serving Routes
+- Configuration Management: Now uses environment variables via pydantic-settings
 """
 
 import os
@@ -25,36 +26,22 @@ import logging
 from datetime import datetime
 
 # ===== CONFIGURATION =====
-try:
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-except FileNotFoundError:
-    print("ERROR: config.json not found!")
-    exit(1)
+# Import settings from config.py (uses pydantic-settings with .env file)
+from config import settings
 
-PATHS = config['paths']
-DB_FILE = PATHS.get('fabric_database_file', 'fabric_database.xlsx')
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-
-# Define all paths from config
-FABRIC_DIR = os.path.join(PROJECT_ROOT, PATHS.get('fabric_dir', 'fabrics'))
-MOCKUP_DIR_TEMPLATES = os.path.join(PROJECT_ROOT, PATHS.get('mockup_dir', 'mockups')) 
-SILHOUETTE_DIR = os.path.join(PROJECT_ROOT, PATHS.get('silhouette_dir', 'silhouettes'))  # Directory for silhouette images
-MASK_DIR = os.path.join(PROJECT_ROOT, PATHS.get('mask_dir', 'masks'))
-MOCKUP_DIR_OUTPUT = os.path.join(PROJECT_ROOT, PATHS.get('mockup_output_dir', 'generated_mockups')) 
-TECHPACK_DIR = os.path.join(PROJECT_ROOT, PATHS.get('pdf_output_dir', 'generated_techpacks'))
-EXCEL_DIR = os.path.join(PROJECT_ROOT, PATHS.get('excel_dir', 'excel_files'))
-FABRIC_SWATCH_DIR = os.path.join(PROJECT_ROOT, PATHS.get('fabric_swatch_dir', 'fabric_swatches'))
-IMAGE_DIR = os.path.join(PROJECT_ROOT, 'images') # New: Explicit Images folder
-
-# Ensure critical directories exist
-for d in [MOCKUP_DIR_OUTPUT, TECHPACK_DIR, IMAGE_DIR, SILHOUETTE_DIR]:
-    if not os.path.exists(d):
-        os.makedirs(d)
-
-TITLE_SLIDE_1_PATH = os.path.join(PROJECT_ROOT, '1st page.png')
-TITLE_SLIDE_2_PATH = os.path.join(PROJECT_ROOT, '2nd page.png')
-DATABASE_PATH = os.path.join(EXCEL_DIR, DB_FILE)
+# Use settings from environment variables
+PROJECT_ROOT = str(settings.project_root_path)
+FABRIC_SWATCH_DIR = str(settings.fabric_dir_path)
+MOCKUP_DIR_TEMPLATES = str(settings.mockup_dir_path)
+SILHOUETTE_DIR = str(settings.silhouette_dir_path)
+MASK_DIR = str(settings.mask_dir_path)
+MOCKUP_DIR_OUTPUT = str(settings.mockup_output_dir_path)
+TECHPACK_DIR = str(settings.pdf_output_dir_path)
+EXCEL_DIR = str(settings.excel_dir_path)
+IMAGE_DIR = str(settings.image_dir_path)
+DATABASE_PATH = str(settings.database_path)
+TITLE_SLIDE_1_PATH = str(settings.title_slide_1_path)
+TITLE_SLIDE_2_PATH = str(settings.title_slide_2_path)
 
 app = Flask(__name__)
 
@@ -86,9 +73,10 @@ def log_response_info(response):
     return response
 
 print("=" * 60)
-print("SRX Fabric Library - API Server (v5.1)")
-print("   Running on: http://localhost:5000")
+print("SRX Fabric Library - API Server (v5.2)")
+print(f"   Running on: http://{settings.FLASK_HOST}:{settings.FLASK_PORT}")
 print("   API Logging: ENABLED")
+print("   Configuration: Environment Variables (.env)")
 print("=" * 60)
 
 # ===== HELPER FUNCTIONS =====
@@ -537,5 +525,9 @@ def serve_css(): return send_from_directory(PROJECT_ROOT, 'styles.css')
 def serve_script(): return send_from_directory(PROJECT_ROOT, 'script.js')
 
 if __name__ == '__main__':
-    # Bind to 0.0.0.0 to allow connections from outside the container/process
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use settings from environment variables
+    app.run(
+        host=settings.FLASK_HOST,
+        port=settings.FLASK_PORT,
+        debug=settings.FLASK_DEBUG
+    )

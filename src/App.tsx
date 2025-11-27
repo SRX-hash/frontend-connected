@@ -15,6 +15,7 @@ import { FinalCTASection } from './components/FinalCTASection';
 import { Footer } from './components/Footer';
 import { SearchPage } from './components/SearchPage';
 import { ManufacturerDashboard } from './components/manufacturer/ManufacturerDashboard';
+import { BuyerDashboard } from './components/buyer/BuyerDashboard';
 import { LoginPage } from './components/LoginPage';
 import { AuthProvider } from './components/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -67,6 +68,17 @@ const AppRoutes: React.FC = () => {
           <ProtectedRoute allowedRole="manufacturer">
             <LightModeWrapper>
               <ManufacturerDashboard />
+            </LightModeWrapper>
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/buyer-dashboard" 
+        element={
+          <ProtectedRoute allowedRole="buyer">
+            <LightModeWrapper>
+              <BuyerDashboard />
             </LightModeWrapper>
           </ProtectedRoute>
         } 

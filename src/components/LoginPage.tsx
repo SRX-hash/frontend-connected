@@ -34,7 +34,7 @@ export const LoginPage: React.FC = () => {
       login(role, email);
       setIsLoading(false);
       if (role === 'buyer') {
-        navigate('/search');
+        navigate('/buyer-dashboard');
       } else {
         navigate('/manufacturer-dashboard');
       }

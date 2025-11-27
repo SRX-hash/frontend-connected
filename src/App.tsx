@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MemoryRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ValuePropSection } from './components/ValuePropSection';
@@ -16,8 +16,10 @@ import { Footer } from './components/Footer';
 import { SearchPage } from './components/SearchPage';
 import { ManufacturerDashboard } from './components/manufacturer/ManufacturerDashboard';
 import { BuyerDashboard } from './components/buyer/BuyerDashboard';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AdminLoginPage } from './components/admin/AdminLoginPage';
 import { LoginPage } from './components/LoginPage';
-import { AuthProvider } from './components/AuthContext';
+import { AuthProvider, useAuth } from './components/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -50,27 +52,38 @@ const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LightModeWrapper><LoginPage /></LightModeWrapper>} />
-      
-      <Route 
-        path="/search" 
+
+      <Route
+        path="/search"
         element={
           <ProtectedRoute allowedRole="buyer">
             <LightModeWrapper>
               <SearchPage />
             </LightModeWrapper>
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/manufacturer-dashboard" 
+
+      <Route
+        path="/manufacturer-dashboard"
         element={
           <ProtectedRoute allowedRole="manufacturer">
             <LightModeWrapper>
               <ManufacturerDashboard />
             </LightModeWrapper>
           </ProtectedRoute>
-        } 
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <LightModeWrapper>
+              <AdminDashboard />
+            </LightModeWrapper>
+          </AdminRoute>
+        }
       />
       
       <Route 
@@ -85,6 +98,17 @@ const AppRoutes: React.FC = () => {
       />
     </Routes>
   );
+};
+
+// Admin Route Guard
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated || user?.role !== 'admin') {
+    return <LightModeWrapper><AdminLoginPage /></LightModeWrapper>;
+  }
+
+  return <>{children}</>;
 };
 
 const App: React.FC = () => {

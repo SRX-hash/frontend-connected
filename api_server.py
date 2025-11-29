@@ -43,12 +43,11 @@ TITLE_SLIDE_2_PATH = str(settings.title_slide_2_path)
 app = Flask(__name__)
 
 # Security: Restrict CORS to frontend origins
-CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://localhost:3000"]}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"]}}, supports_credentials=True)
 
 # Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'instance', 'fabric_sourcing.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 # Security: JWT Secret Key
 app.config['JWT_SECRET_KEY'] = os.environ.get('SECRET_KEY')
 if not app.config['JWT_SECRET_KEY']:

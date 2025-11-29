@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { 
+import {
   LayoutDashboard,
   Search,
-  FileText, 
+  FileText,
   Package,
-  AlertCircle, 
-  Eye, 
-  X, 
-  Clock, 
-  Truck, 
+  AlertCircle,
+  Eye,
+  X,
+  Clock,
+  Truck,
   Star,
   Image as ImageIcon,
   ExternalLink,
@@ -289,11 +289,11 @@ export const BuyerDashboard: React.FC = () => {
         if (response.ok) {
           const result = await response.json();
           if (page === 1) {
-            setFabrics(result.data);
+            setFabrics(result.results || []);
           } else {
-            setFabrics(prev => [...prev, ...result.data]);
+            setFabrics(prev => [...prev, ...(result.results || [])]);
           }
-          setHasMore(result.has_more);
+          setHasMore(page < result.pages);
           setTotalResults(result.total);
         }
       } catch (error) {
@@ -324,7 +324,7 @@ export const BuyerDashboard: React.FC = () => {
     const target = e.target as HTMLElement;
     const isToggleButton = target.closest('[data-sidebar-toggle]');
     const isSidebar = target.closest('[data-sidebar]');
-    
+
     if (!isToggleButton && !isSidebar && sidebarOpen) {
       setSidebarOpen(false);
     }
@@ -365,7 +365,7 @@ export const BuyerDashboard: React.FC = () => {
             </div>
 
             <div className="mb-6">
-              <SearchFilters 
+              <SearchFilters
                 filters={filters}
                 setFilters={setFilters}
               />
@@ -640,9 +640,8 @@ export const BuyerDashboard: React.FC = () => {
                         {order.tracking_timeline.map((event, idx) => (
                           <div key={idx} className="flex gap-4">
                             <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${
-                                event.completed ? 'bg-primary-600' : 'bg-neutral-300 border-2 border-neutral-400'
-                              }`} />
+                              <div className={`w-3 h-3 rounded-full ${event.completed ? 'bg-primary-600' : 'bg-neutral-300 border-2 border-neutral-400'
+                                }`} />
                               {idx < order.tracking_timeline.length - 1 && (
                                 <div className={`w-0.5 h-12 ${event.completed ? 'bg-primary-600' : 'bg-neutral-300'}`} />
                               )}
@@ -801,7 +800,7 @@ export const BuyerDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 flex">
       {/* Sidebar */}
-      <div 
+      <div
         data-sidebar
         className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-white border-r border-neutral-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden relative`}
       >
@@ -832,11 +831,10 @@ export const BuyerDashboard: React.FC = () => {
                       setSidebarOpen(false);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
                       ? 'bg-primary-50 text-primary-700 font-semibold'
                       : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">{item.label}</span>

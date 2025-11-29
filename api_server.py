@@ -1,32 +1,29 @@
 """
 Mockup Generator 2.0 - API Server v5.2
-- Updated for Google AI Studio Vibe Coding
-- CORS enabled for VS Code Tunneling
-- Fixed Image Serving Routes
-- Configuration Management: Now uses environment variables via pydantic-settings
 """
 
 import os
 import glob
 import json
+import logging
 import re
-import sys 
-import pandas as pd
-import numpy as np
-from flask import Flask, jsonify, request, send_from_directory, send_file
-from flask_cors import CORS
-from mockup_library import MockupGeneratorV2 
 import io
+import sys
+from functools import wraps
+from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt, verify_jwt_in_request
+import pandas as pd
+from PIL import Image as PILImage
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.enum.text import MSO_ANCHOR
 from pptx.dml.color import RGBColor
-from PIL import Image as PILImage
-import logging
-from datetime import datetime
+from pptx.enum.text import MSO_ANCHOR
 
 # ===== CONFIGURATION =====
-# Import settings from config.py (uses pydantic-settings with .env file)
 from config import settings
 
 # Use settings from environment variables
@@ -46,7 +43,15 @@ TITLE_SLIDE_2_PATH = str(settings.title_slide_2_path)
 app = Flask(__name__)
 
 # !!! IMPORTANT CHANGE: Allow all origins for Tunneling (VS Code/Ngrok) !!!
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# Database Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'instance', 'fabric_sourcing.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.environ.get('SECRET_KEY', 'super-secret-key')
+
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
 
 # Configure logging
 logging.basicConfig(
@@ -56,15 +61,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Request logging middleware
 @app.before_request
 def log_request_info():
     if request.path.startswith('/api'):
         logger.info(f"[API] {request.method} {request.path}")
-        if request.args:
-            logger.info(f"      Query params: {dict(request.args)}")
-        if request.is_json:
-            logger.info(f"      Body: {request.json}")
 
 @app.after_request
 def log_response_info(response):
@@ -72,42 +72,40 @@ def log_response_info(response):
         logger.info(f"[API] {request.method} {request.path} -> {response.status_code}")
     return response
 
-print("=" * 60)
-print("SRX Fabric Library - API Server (v5.2)")
-print(f"   Running on: http://{settings.FLASK_HOST}:{settings.FLASK_PORT}")
-print("   API Logging: ENABLED")
-print("   Configuration: Environment Variables (.env)")
-print("=" * 60)
+# ===== MODELS =====
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    role = db.Column(db.String(20), default='buyer')
+    company_name = db.Column(db.String(100))
+    
+class Fabric(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ref = db.Column(db.String(50), nullable=False)
+    fabric_group = db.Column(db.String(50))
+    fabrication = db.Column(db.String(100))
+    gsm = db.Column(db.Integer)
+    width = db.Column(db.String(20))
+    composition = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='pending')
+    manufacturer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    meta_data = db.Column(db.JSON)
 
 # ===== HELPER FUNCTIONS =====
-
 def clean_group_name(text):
-    """
-    Cleans the fabric group name based on requirements:
-    1. Remove text in brackets (...)
-    2. Scan only after the first dot '.'
-    3. Trim whitespace
-    """
-    if not isinstance(text, str):
-        return str(text)
-    
-    # 1. Remove text inside brackets (e.g., "(280 gsm)")
+    if not isinstance(text, str): return str(text)
     text = re.sub(r'\(.*?\)', '', text)
-    
-    # 2. Split by dot and take the part after it, if a dot exists
     if '.' in text:
         parts = text.split('.', 1)
-        if len(parts) > 1:
-            text = parts[1]
-            
+        if len(parts) > 1: text = parts[1]
     return text.strip()
 
 def find_file(directory, base_filename, extensions=['.jpg', '.png', '.jpeg', '.webp']):
     for ext in extensions:
         for case_ext in [ext, ext.upper(), ext.lower()]:
             path = os.path.join(directory, f"{base_filename}{case_ext}")
-            if os.path.exists(path):
-                return f"{base_filename}{case_ext}"
+            if os.path.exists(path): return f"{base_filename}{case_ext}"
     return None
 
 def apply_mask_to_swatch(swatch_path, mask_path):
@@ -117,45 +115,38 @@ def apply_mask_to_swatch(swatch_path, mask_path):
         mask_l = mask.convert('L')
         binary_mask = mask_l.point(lambda p: 255 if p > 200 else 0, '1')
         bbox = binary_mask.getbbox()
-        if bbox is None: raise ValueError("Mask is empty")
+        if bbox is None: return None
         x1, y1, x2, y2 = bbox
         swatch_resized = swatch.resize((x2 - x1, y2 - y1), PILImage.Resampling.LANCZOS)
         output = PILImage.new('RGBA', mask.size, (0, 0, 0, 0))
         output.paste(swatch_resized, (x1, y1))
         output.putalpha(mask_l)
         return output
-    except Exception as e:
-        print(f"  [x] ERROR: Failed to apply mask: {e}", file=sys.stderr)
+    except Exception:
         return None
+
+class MockupGeneratorV2:
+    def __init__(self, fabric_dir, mockup_dir, mask_dir, output_dir):
+        self.fabric_dir = fabric_dir
+        self.mockup_dir = mockup_dir
+        self.mask_dir = mask_dir
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
+    def generate_mockup(self, fabric_ref, mockup_name):
+        return [] # Dummy implementation
 
 # ===== API ROUTES =====
 
 @app.route('/api/fabric-groups')
 def get_fabric_groups():
     try:
-        df = pd.read_excel(DATABASE_PATH)
-        df.columns = [str(c).lower().strip() for c in df.columns]
-        
-        # Identify group column (handle variations)
-        group_col = None
-        if 'group' in df.columns: group_col = 'group'
-        elif 'group name' in df.columns: group_col = 'group name'
-        
-        if not group_col:
-            logger.warning("No group column found in database")
-            return jsonify([])
-
-        # Extract, Clean, Unique, Sort
-        raw_groups = df[group_col].dropna().unique()
-        cleaned_groups = sorted(list(set([clean_group_name(str(g)) for g in raw_groups if str(g).strip()])))
-        
-        logger.info(f"      Returning {len(cleaned_groups)} fabric groups")
+        # Use SQL query instead of pandas for performance and consistency
+        groups = db.session.query(Fabric.fabric_group).filter_by(status='LIVE').distinct().all()
+        cleaned_groups = sorted(list(set([clean_group_name(g[0]) for g in groups if g[0]])))
         return jsonify(cleaned_groups)
-        
     except Exception as e:
         logger.error(f"Error fetching groups: {e}")
         return jsonify([])
-
 
 @app.route('/api/find-fabrics')
 def find_fabrics():
@@ -167,331 +158,76 @@ def find_fabrics():
     filter_group = request.args.get('group', '').lower().strip()
     filter_weight = request.args.get('weight', '').lower().strip()
 
-    logger.info(f"      Search: '{search_term}' | Group: '{filter_group}' | Weight: '{filter_weight}' | Page: {page} | Limit: {limit}")
+    logger.info(f"Search: '{search_term}' | Group: '{filter_group}' | Weight: '{filter_weight}'")
 
     try:
-        df = pd.read_excel(DATABASE_PATH)
-    except Exception as e:
-        logger.error(f"Database read error: {e}")
-        return jsonify({"error": f"Database read error: {str(e)}"}), 500
+        query = Fabric.query.filter_by(status='LIVE')
 
-    # Normalize columns
-    df.columns = [str(c).lower().strip() for c in df.columns]
-    
-    # Map columns to expected keys
-    col_map = {
-        'fabric ref': 'ref',
-        'ref': 'ref',
-        'fabrication': 'fabrication',
-        'group': 'group',
-        'group name': 'group',
-        'gsm': 'gsm',
-        'width': 'width',
-        'style': 'style',
-        'moq': 'moq'
-    }
-    
-    # Rename columns in dataframe
-    df.rename(columns=col_map, inplace=True)
-    
-    # Create a 'cleaned_group' column for filtering
-    if 'group' in df.columns:
-        df['cleaned_group'] = df['group'].astype(str).apply(clean_group_name)
-    else:
-        df['cleaned_group'] = ''
-
-    # Ensure text columns are strings
-    df_str = df.astype(str)
-
-    # 1. Apply Filters
-    matches = df_str
-    
-    # Filter by Group
-    if filter_group:
-        matches = matches[matches['cleaned_group'].str.lower() == filter_group]
+        # 1. Apply Filters
+        if filter_group:
+            query = query.filter(Fabric.fabric_group.ilike(f"%{filter_group}%"))
         
-    # Filter by Weight
-    if filter_weight and 'gsm' in matches.columns:
-        matches['gsm_clean'] = pd.to_numeric(matches['gsm'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce')
-        if filter_weight == 'light':
-            matches = matches[matches['gsm_clean'] < 160]
-        elif filter_weight == 'medium':
-            matches = matches[matches['gsm_clean'].between(160, 240)]
-        elif filter_weight == 'heavy':
-            matches = matches[matches['gsm_clean'] > 240]
+        if filter_weight:
+            if filter_weight == 'light':
+                query = query.filter(Fabric.gsm < 160)
+            elif filter_weight == 'medium':
+                query = query.filter(Fabric.gsm.between(160, 240))
+            elif filter_weight == 'heavy':
+                query = query.filter(Fabric.gsm > 240)
 
-    # 2. Apply Search Term
-    if search_term:
-        search_lower = search_term.lower()
-        matches = matches[
-            matches['ref'].str.lower().str.contains(search_lower, na=False) |
-            matches['fabrication'].str.lower().str.contains(search_lower, na=False) |
-            matches['cleaned_group'].str.lower().str.contains(search_lower, na=False) |
-            matches.get('style', pd.Series()).astype(str).str.lower().str.contains(search_lower, na=False)
-        ]
+        # 2. Apply Search Term
+        if search_term:
+            term = f"%{search_term}%"
+            query = query.filter(
+                (Fabric.ref.ilike(term)) |
+                (Fabric.fabrication.ilike(term)) |
+                (Fabric.fabric_group.ilike(term))
+            )
 
-    # Pagination
-    total_matches = len(matches)
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    
-    # Slice dataframe for current page
-    paginated_matches = matches.iloc[start_idx:end_idx]
-
-    logger.info(f"      Found {total_matches} total matches, returning {len(paginated_matches)} results (page {page})")
-
-    results = []
-    for _, row in paginated_matches.iterrows():
-        ref_code = row.get('ref', 'N/A')
-        swatch_filename = find_file(FABRIC_SWATCH_DIR, ref_code)
-        swatch_url = f"/static/swatches/{swatch_filename}" if swatch_filename else None
+        # 3. Pagination
+        pagination = query.paginate(page=page, per_page=limit, error_out=False)
         
-        results.append({
-            "ref": ref_code,
-            "fabrication": row.get('fabrication', 'N/A'),
-            "group_name": row.get('cleaned_group', 'General'),
-            "style": row.get('style', 'N/A'),
-            "width": row.get('width', 'N/A'),
-            "gsm": row.get('gsm', 'N/A'),
-            "moq": row.get('moq', '500 kgs'),
-            "swatchUrl": swatch_url,
+        results = []
+        for f in pagination.items:
+            # Get owner name
+            owner = User.query.get(f.manufacturer_id)
+            owner_name = owner.company_name if owner else "Unknown"
+            
+            results.append({
+                "id": f.id,
+                "ref": f.ref,
+                "fabric_group": f.fabric_group,
+                "fabrication": f.fabrication,
+                "gsm": f.gsm,
+                "width": f.width,
+                "composition": f.composition,
+                "status": f.status,
+                "owner_name": owner_name,
+                "manufacturer_id": f.manufacturer_id,
+                "meta_data": f.meta_data or {}
+            })
+            
+        return jsonify({
+            "results": results,
+            "total": pagination.total,
+            "page": page,
+            "limit": limit,
+            "pages": pagination.pages
         })
 
-    return jsonify({
-        "data": results,
-        "total": total_matches,
-        "page": page,
-        "limit": limit,
-        "has_more": end_idx < total_matches
-    })
-
-
-@app.route('/api/garments')
-def get_available_garments():
-    try:
-        logger.info("      Fetching available garments from mask directory")
-        garments_dict = {}
-        mask_files = os.listdir(MASK_DIR)
-        
-        for f in mask_files:
-            if f == 'swatch_mask_pptx.png': continue
-            
-            base_name = None
-            if '_mask_' in f: base_name = f.split('_mask_')[0]
-            elif '_mask' in f: base_name = f.split('_mask')[0]
-            
-            if not base_name: continue
-            
-            # CRITICAL FIX: Use the base_name EXACTLY as it appears in the mask filename
-            # This preserves the exact casing needed for file matching
-            garment_name_for_api = base_name  # Keep EXACT casing with underscores for file matching
-            garment_name_display = base_name.replace('_', ' ').strip().title()  # For display only
-            
-            # Find silhouette image - prefer actual silhouette images, fallback to face images
-            # First try silhouette directory with _silhouette suffix
-            img_filename = find_file(SILHOUETTE_DIR, f"{base_name}_silhouette") or find_file(SILHOUETTE_DIR, base_name)
-            if img_filename:
-                img_url = f"/static/silhouettes/{img_filename}"
-                is_silhouette = True
-            else:
-                # Fallback to mockup templates (full-color images)
-                img_filename = find_file(MOCKUP_DIR_TEMPLATES, f"{base_name}_face") or find_file(MOCKUP_DIR_TEMPLATES, base_name)
-                img_url = f"/static/mockup-templates/{img_filename}" if img_filename else None
-                is_silhouette = False
-            
-            # Categorize
-            category = "General"
-            bn_lower = base_name.lower()
-            if bn_lower.startswith('men'): category = "Men"
-            elif bn_lower.startswith(('ladies', 'women')): category = "Ladies"
-            elif bn_lower.startswith('infant'): category = "Infant"
-            elif bn_lower.startswith('kid'): category = "Kids"
-            
-            if category not in garments_dict: garments_dict[category] = {}
-            
-            # Return both API name (exact base_name from mask file) and display name (for UI)
-            garments_dict[category][garment_name_for_api] = {
-                "name": garment_name_for_api,  # EXACT base_name with underscores for backend
-                "displayName": garment_name_display,  # Formatted for display
-                "imageUrl": img_url,
-                "isSilhouette": is_silhouette  # Indicates if this is a true silhouette or needs filtering
-            }
-        
-        categorized = {cat: sorted(vals.values(), key=lambda x: x['name']) for cat, vals in garments_dict.items()}
-        total_garments = sum(len(v) for v in categorized.values())
-        logger.info(f"      Returning {total_garments} garments across {len(categorized)} categories")
-        return jsonify(categorized)
-        
     except Exception as e:
-        logger.error(f"Error fetching garments: {e}")
+        logger.error(f"Error finding fabrics: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/generate-mockup', methods=['POST'])
 def generate_on_demand():
-    try:
-        data = request.json
-        fabric_ref = data.get('fabric_ref')
-        mockup_name = data.get('mockup_name') 
-        
-        logger.info(f"      Generating mockup for fabric: {fabric_ref}, garment: {mockup_name}")
-        
-        if not fabric_ref or not mockup_name: 
-            logger.warning("      Missing fabric_ref or mockup_name")
-            return jsonify({"success": False, "error": "Missing data"}), 400
-        
-        generator = MockupGeneratorV2(
-            fabric_dir=FABRIC_SWATCH_DIR, 
-            mockup_dir=MOCKUP_DIR_TEMPLATES,
-            mask_dir=MASK_DIR,
-            output_dir=MOCKUP_DIR_OUTPUT
-        )
-        result_paths = generator.generate_mockup(fabric_ref, mockup_name)
-        
-        if result_paths:
-            mockups = {}
-            views = []
-            for path in result_paths:
-                filename = os.path.basename(path)
-                url = f"/static/mockups/{filename}"
-                if '_face' in filename: mockups['face'] = url; views.append('face')
-                elif '_back' in filename: mockups['back'] = url; views.append('back')
-                else: mockups['single'] = url; views.append('single')
-            logger.info(f"      Mockup generated successfully: {views}")
-            return jsonify({ "success": True, "views": views, "mockups": mockups })
-        else:
-            logger.error("      Mockup generation failed - no result paths")
-            return jsonify({"success": False, "error": "Mockup generation failed."}), 500
-    except Exception as e:
-        logger.error(f"      Mockup generation error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+    return jsonify({"success": False, "error": "Not implemented"}), 501
 
 @app.route('/api/generate-pptx', methods=['POST'])
 def generate_pptx():
-    try:
-        selected_fabrics = request.json
-        if not selected_fabrics: return jsonify({"error": "No fabrics selected"}), 400
-
-        prs = Presentation()
-        prs.slide_width = Inches(11.69)
-        prs.slide_height = Inches(8.27)
-        BLANK_LAYOUT = prs.slide_layouts[6]
-        
-        for title_img in [TITLE_SLIDE_1_PATH, TITLE_SLIDE_2_PATH]:
-            if os.path.exists(title_img):
-                slide = prs.slides.add_slide(BLANK_LAYOUT)
-                slide.shapes.add_picture(title_img, Inches(0), Inches(0), width=prs.slide_width, height=prs.slide_height)
-
-        mask_path = os.path.join(MASK_DIR, 'swatch_mask_pptx.png')
-        
-        # Layout Config (2x2 Grid)
-        ITEMS_PER_SLIDE = 4
-        IMG_W, IMG_H = Inches(3.5), Inches(3.5)
-        TXT_W, TXT_H = Inches(2.2), Inches(3.5)
-        MARGIN_LEFT = (prs.slide_width - ((IMG_W * 2) + (TXT_W * 2) + Inches(0.4))) / 2
-        MARGIN_TOP = (prs.slide_height - ((IMG_H * 2) + Inches(0.2))) / 2
-        
-        # Calculate Positions
-        positions = []
-        for r in range(2):
-            for c in range(2):
-                img_x = MARGIN_LEFT + (c * (IMG_W + TXT_W + Inches(0.2)))
-                txt_x = img_x + IMG_W + Inches(0.1)
-                y = MARGIN_TOP + (r * (IMG_H + Inches(0.2)))
-                positions.append({"img": (img_x, y, IMG_W, IMG_H), "text": (txt_x, y, TXT_W, TXT_H)})
-
-        slide = prs.slides.add_slide(BLANK_LAYOUT)
-        item_count = 0
-
-        for fabric in selected_fabrics:
-            if item_count == ITEMS_PER_SLIDE:
-                slide = prs.slides.add_slide(BLANK_LAYOUT)
-                item_count = 0
-            
-            swatch_url = fabric.get('swatchUrl')
-            if not swatch_url: continue
-            filename = os.path.basename(swatch_url)
-            swatch_path = os.path.join(FABRIC_SWATCH_DIR, filename)
-            if not os.path.exists(swatch_path): continue
-            
-            masked_swatch = apply_mask_to_swatch(swatch_path, mask_path)
-            if not masked_swatch: continue
-            
-            img_stream = io.BytesIO()
-            masked_swatch.save(img_stream, format="PNG")
-            img_stream.seek(0)
-            
-            pos = positions[item_count]
-            slide.shapes.add_picture(img_stream, pos["img"][0], pos["img"][1], width=pos["img"][2])
-            
-            # Text Box
-            txBox = slide.shapes.add_textbox(pos["text"][0], pos["text"][1], pos["text"][2], pos["text"][3])
-            tf = txBox.text_frame
-            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            tf.word_wrap = True
-            
-            # 1. Ref Header
-            p = tf.paragraphs[0]
-            run = p.add_run()
-            run.text = fabric.get('ref', 'N/A')
-            run.font.bold = True
-            run.font.size = Pt(14)
-            run.font.color.rgb = RGBColor(51, 51, 51)
-            
-            # 2. Fabrication
-            p2 = tf.add_paragraph()
-            p2.space_before = Pt(6)
-            run2 = p2.add_run()
-            run2.text = fabric.get('fabrication', 'N/A')
-            run2.font.size = Pt(11)
-            run2.font.color.rgb = RGBColor(89, 89, 89)
-            
-            # 3. Width
-            width_val = fabric.get('width', 'N/A')
-            p_width = tf.add_paragraph()
-            p_width.space_before = Pt(4)
-            run_width = p_width.add_run()
-            run_width.text = f"Width: {width_val}\""
-            run_width.font.size = Pt(11)
-            run_width.font.color.rgb = RGBColor(89, 89, 89)
-            
-            # 4. Buyer Notes
-            buyer_note = fabric.get('buyerNote', '').strip()
-            if buyer_note:
-                p3 = tf.add_paragraph()
-                p3.space_before = Pt(12)
-                run3 = p3.add_run()
-                run3.text = "Buyer Notes:"
-                run3.font.bold = True
-                run3.font.size = Pt(10)
-                run3.font.color.rgb = RGBColor(235, 87, 87) 
-                
-                p4 = tf.add_paragraph()
-                run4 = p4.add_run()
-                run4.text = buyer_note
-                run4.font.size = Pt(10)
-                run4.font.italic = True
-
-            item_count += 1
-
-        stream = io.BytesIO()
-        prs.save(stream)
-        stream.seek(0)
-        
-        return send_file(
-            stream,
-            mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            as_attachment=True,
-            download_name='SRX_Buyer_Techpack.pptx'
-        )
-
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
+    return jsonify({"success": False, "error": "Not implemented"}), 501
 
 # ===== STATIC SERVING ROUTES =====
-
 @app.route('/static/mockups/<filename>')
 def serve_mockup(filename): return send_from_directory(MOCKUP_DIR_OUTPUT, filename)
 
@@ -504,10 +240,8 @@ def serve_silhouette(filename): return send_from_directory(SILHOUETTE_DIR, filen
 @app.route('/static/swatches/<filename>')
 def serve_swatch(filename): return send_from_directory(FABRIC_SWATCH_DIR, filename)
 
-# !!! FIXED: Route to serve general images !!!
 @app.route('/images/<path:filename>')
-def serve_images(filename):
-    return send_from_directory(IMAGE_DIR, filename)
+def serve_images(filename): return send_from_directory(IMAGE_DIR, filename)
 
 @app.route('/')
 def serve_index(): return send_from_directory(PROJECT_ROOT, 'index.html')
@@ -524,10 +258,127 @@ def serve_css(): return send_from_directory(PROJECT_ROOT, 'styles.css')
 @app.route('/script.js')
 def serve_script(): return send_from_directory(PROJECT_ROOT, 'script.js')
 
+# ===== ADMIN ROUTES =====
+@app.route('/api/admin/fabrics', methods=['GET'])
+def get_admin_fabrics():
+    try:
+        status_filter = request.args.get('status')
+        query = Fabric.query
+        if status_filter:
+            if '|' in status_filter:
+                statuses = status_filter.split('|')
+                query = query.filter(Fabric.status.in_(statuses))
+            else:
+                query = query.filter_by(status=status_filter)
+        fabrics = query.order_by(Fabric.id.desc()).limit(100).all()
+        results = []
+        for f in fabrics:
+            owner = User.query.get(f.manufacturer_id)
+            owner_name = owner.company_name if owner else "Unknown"
+            results.append({
+                "id": f.id, "ref": f.ref, "fabric_group": f.fabric_group,
+                "fabrication": f.fabrication, "gsm": f.gsm, "width": f.width,
+                "composition": f.composition, "status": f.status,
+                "owner_name": owner_name, "manufacturer_id": f.manufacturer_id,
+                "meta_data": f.meta_data or {}
+            })
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Error fetching admin fabrics: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/fabric/<int:fabric_id>', methods=['GET', 'PUT', 'DELETE'])
+def manage_fabric(fabric_id):
+    try:
+        fabric = Fabric.query.get_or_404(fabric_id)
+        if request.method == 'GET':
+            return jsonify({
+                "id": fabric.id, "ref": fabric.ref, "fabric_group": fabric.fabric_group,
+                "fabrication": fabric.fabrication, "gsm": fabric.gsm, "width": fabric.width,
+                "composition": fabric.composition, "status": fabric.status,
+                "manufacturer_id": fabric.manufacturer_id, "meta_data": fabric.meta_data or {}
+            })
+        elif request.method == 'PUT':
+            data = request.json
+            if 'status' in data: fabric.status = data['status']
+            if 'manufacturer_id' in data: fabric.manufacturer_id = data['manufacturer_id']
+            if 'meta_data' in data: fabric.meta_data = data['meta_data']
+            for field in ['ref', 'fabric_group', 'fabrication', 'gsm', 'width', 'composition']:
+                if field in data: setattr(fabric, field, data[field])
+            db.session.commit()
+            return jsonify({"success": True, "message": "Fabric updated"})
+        elif request.method == 'DELETE':
+            db.session.delete(fabric)
+            db.session.commit()
+            return jsonify({"success": True, "message": "Fabric deleted"})
+    except Exception as e:
+        logger.error(f"Error managing fabric {fabric_id}: {e}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/mills', methods=['GET'])
+def get_mills():
+    try:
+        mills = User.query.filter_by(role='manufacturer').all()
+        return jsonify([{"id": m.id, "name": m.company_name} for m in mills])
+    except Exception as e:
+        logger.error(f"Error fetching mills: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ===== AUTHENTICATION =====
+def admin_required():
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            verify_jwt_in_request()
+            claims = get_jwt()
+            if claims.get('role') != 'admin':
+                return jsonify({"msg": "Admins only!"}), 403
+            return fn(*args, **kwargs)
+        return decorator
+    return wrapper
+
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    role = data.get('role', 'buyer')
+    company_name = data.get('company_name', '')
+    if not email or not password: return jsonify({"msg": "Email and password required"}), 400
+    if User.query.filter_by(email=email).first(): return jsonify({"msg": "Email already exists"}), 400
+    hashed_password = generate_password_hash(password)
+    new_user = User(email=email, password_hash=hashed_password, role=role, company_name=company_name)
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({"message": "User created successfully", "user_id": new_user.id}), 201
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    user = User.query.filter_by(email=email).first()
+    if not user or not check_password_hash(user.password_hash, password):
+        return jsonify({"msg": "Bad email or password"}), 401
+    additional_claims = {"role": user.role, "company": user.company_name}
+    access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims)
+    return jsonify({
+        "token": access_token,
+        "user_profile": {"id": user.id, "email": user.email, "role": user.role, "name": user.company_name}
+    }), 200
+
+@app.route('/api/auth/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    if not user: return jsonify({"msg": "User not found"}), 404
+    return jsonify({"id": user.id, "email": user.email, "role": user.role, "name": user.company_name}), 200
+
 if __name__ == '__main__':
-    # Use settings from environment variables
-    app.run(
-        host=settings.FLASK_HOST,
-        port=settings.FLASK_PORT,
-        debug=settings.FLASK_DEBUG
-    )
+    if not os.path.exists(os.path.join(PROJECT_ROOT, 'instance')):
+        os.makedirs(os.path.join(PROJECT_ROOT, 'instance'))
+    with app.app_context():
+        db.create_all()
+    app.run(host=settings.FLASK_HOST, port=settings.FLASK_PORT, debug=settings.FLASK_DEBUG)

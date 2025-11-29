@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '@/components/AuthContext';
 import {
   LayoutDashboard,
   AlertCircle,
@@ -15,9 +15,13 @@ import {
   ChevronLeft,
   Shield
 } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Card } from '../ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { StagingInbox } from './content/StagingInbox';
+import { LiveDbView } from './content/LiveDbView';
+import { FabricEditor } from './content/FabricEditor';
+import { AdminFabric } from '@/types';
 
 // Types
 interface AdminDashboardData {
@@ -73,7 +77,7 @@ interface Query {
   action: string;
 }
 
-type DashboardView = 'dashboard' | 'action-center' | 'finance' | 'messages';
+type DashboardView = 'dashboard' | 'action-center' | 'finance' | 'messages' | 'content-manager';
 
 // Mock data
 const MOCK_DATA: AdminDashboardData = {
@@ -145,6 +149,10 @@ export const AdminDashboard: React.FC = () => {
   const [actionCenterTab, setActionCenterTab] = useState<'rfqs' | 'fabrics'>('rfqs');
   const [messageTab, setMessageTab] = useState<'buyers' | 'manufacturers'>('buyers');
 
+  // Content Manager State
+  const [contentTab, setContentTab] = useState<'staging' | 'live'>('staging');
+  const [editingFabric, setEditingFabric] = useState<AdminFabric | null>(null);
+
   const getRiskBadge = (riskScore: string) => {
     const riskMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       'LOW': { label: 'Low Risk', variant: 'default' },
@@ -179,7 +187,7 @@ export const AdminDashboard: React.FC = () => {
     const target = e.target as HTMLElement;
     const isToggleButton = target.closest('[data-sidebar-toggle]');
     const isSidebar = target.closest('[data-sidebar]');
-    
+
     if (!isToggleButton && !isSidebar && sidebarOpen) {
       setSidebarOpen(false);
     }
@@ -187,6 +195,7 @@ export const AdminDashboard: React.FC = () => {
 
   const menuItems = [
     { id: 'dashboard' as DashboardView, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'content-manager' as DashboardView, label: 'Content Manager', icon: Edit },
     { id: 'action-center' as DashboardView, label: 'Action Center', icon: AlertCircle },
     { id: 'finance' as DashboardView, label: 'Finance Desk', icon: DollarSign },
     { id: 'messages' as DashboardView, label: 'Message Relay', icon: MessageSquare },
@@ -300,6 +309,58 @@ export const AdminDashboard: React.FC = () => {
           </div>
         );
 
+      case 'content-manager':
+        if (editingFabric) {
+          return (
+            <FabricEditor
+              fabric={editingFabric}
+              onClose={() => setEditingFabric(null)}
+              onSave={() => {
+                setEditingFabric(null);
+                // Ideally refresh the list, but components handle their own fetching for now.
+                // We could lift state or use a query library, but for this scope, re-mounting or internal refresh is fine.
+              }}
+            />
+          );
+        }
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-neutral-900 mb-2">Content Manager</h1>
+              <p className="text-neutral-500">Moderate fabric uploads and manage the live database</p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-neutral-200">
+              <button
+                onClick={() => setContentTab('staging')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${contentTab === 'staging'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
+              >
+                Staging Inbox
+              </button>
+              <button
+                onClick={() => setContentTab('live')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${contentTab === 'live'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
+              >
+                Live Database
+              </button>
+            </div>
+
+            {contentTab === 'staging' ? (
+              <StagingInbox onReview={setEditingFabric} />
+            ) : (
+              <LiveDbView onEdit={setEditingFabric} />
+            )}
+          </div>
+        );
+
       case 'action-center':
         return (
           <div className="space-y-6">
@@ -312,21 +373,19 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex gap-2 border-b border-neutral-200">
               <button
                 onClick={() => setActionCenterTab('rfqs')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  actionCenterTab === 'rfqs'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-neutral-500 hover:text-neutral-900'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${actionCenterTab === 'rfqs'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
               >
                 RFQ Moderation ({data.admin_dashboard.action_center.rfq_moderation.length})
               </button>
               <button
                 onClick={() => setActionCenterTab('fabrics')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  actionCenterTab === 'fabrics'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-neutral-500 hover:text-neutral-900'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${actionCenterTab === 'fabrics'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
               >
                 Fabric Approval ({data.admin_dashboard.action_center.fabric_approval.length})
               </button>
@@ -463,21 +522,19 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex gap-2 border-b border-neutral-200">
               <button
                 onClick={() => setMessageTab('buyers')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  messageTab === 'buyers'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-neutral-500 hover:text-neutral-900'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${messageTab === 'buyers'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
               >
                 Buyer Queries ({data.admin_dashboard.message_relay_center.buyer_queries.length})
               </button>
               <button
                 onClick={() => setMessageTab('manufacturers')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  messageTab === 'manufacturers'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-neutral-500 hover:text-neutral-900'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${messageTab === 'manufacturers'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900'
+                  }`}
               >
                 Manufacturer Queries ({data.admin_dashboard.message_relay_center.manufacturer_queries.length})
               </button>
@@ -570,11 +627,10 @@ export const AdminDashboard: React.FC = () => {
                       setSidebarOpen(false);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-red-50 text-red-700 font-semibold'
-                      : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
-                  }`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                    ? 'bg-red-50 text-red-700 font-semibold'
+                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">{item.label}</span>

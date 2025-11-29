@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext';
 export const LoginPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { login } = useAuth();
+    const { login, signup } = useAuth();
 
     const [role, setRole] = useState<'buyer' | 'manufacturer'>('buyer');
     const [isLogin, setIsLogin] = useState(true);
@@ -25,29 +25,35 @@ export const LoginPage: React.FC = () => {
         }
     }, [searchParams]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // Simulate network request
-        setTimeout(() => {
-            login(role, email);
-            setIsLoading(false);
-            if (role === 'buyer') {
-                navigate('/buyer-dashboard');
+        try {
+            if (isLogin) {
+                await login(role, email, password);
+                // Navigation logic
+                if (role === 'buyer' || email === 'admin@linker.app') {
+                    if (email === 'admin@linker.app') navigate('/admin');
+                    else navigate('/buyer-dashboard');
+                } else {
+                    navigate('/manufacturer-dashboard');
+                }
             } else {
-                navigate('/manufacturer-dashboard');
+                await signup(email, password, role);
+                setIsLogin(true); // Switch to login mode after signup
             }
-        }, 1500);
+        } catch (error) {
+            console.error("Authentication failed", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
         <div className="min-h-screen w-full relative flex items-center justify-center overflow-hidden bg-neutral-50 font-sans">
 
-            {/* Animated Background Blobs 
-          Using standard colors (blue-300, green-300, pink-300) and inline styles for animation delays 
-          to ensure they are visible and staggered correctly.
-      */}
+            {/* Animated Background Blobs */}
             <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
                 {/* Blob 1: Blue - Top Left */}
                 <div

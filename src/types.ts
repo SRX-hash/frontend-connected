@@ -43,6 +43,20 @@ export interface ManufacturerFabric {
   updatedAt?: string;
 }
 
+export interface AdminFabric {
+  id: number;
+  ref: string;
+  fabric_group: string;
+  fabrication: string;
+  gsm: string;
+  width: string;
+  composition: string;
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'LIVE';
+  owner_name: string;
+  manufacturer_id: number;
+  meta_data: Record<string, any>;
+}
+
 export interface FAQItem {
   question: string;
   answer: string;

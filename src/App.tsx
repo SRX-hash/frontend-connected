@@ -17,7 +17,7 @@ import { SearchPage } from './components/SearchPage';
 import { ManufacturerDashboard } from './components/manufacturer/ManufacturerDashboard';
 import { BuyerDashboard } from './components/buyer/BuyerDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { AdminLoginPage } from './components/admin/AdminLoginPage';
+
 import { LoginPage } from './components/LoginPage';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -78,37 +78,26 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin"
         element={
-          <AdminRoute>
+          <ProtectedRoute allowedRole="admin">
             <LightModeWrapper>
               <AdminDashboard />
             </LightModeWrapper>
-          </AdminRoute>
+          </ProtectedRoute>
         }
       />
-      
-      <Route 
-        path="/buyer-dashboard" 
+
+      <Route
+        path="/buyer-dashboard"
         element={
           <ProtectedRoute allowedRole="buyer">
             <LightModeWrapper>
               <BuyerDashboard />
             </LightModeWrapper>
           </ProtectedRoute>
-        } 
+        }
       />
     </Routes>
   );
-};
-
-// Admin Route Guard
-const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
-
-  if (!isAuthenticated || user?.role !== 'admin') {
-    return <LightModeWrapper><AdminLoginPage /></LightModeWrapper>;
-  }
-
-  return <>{children}</>;
 };
 
 const App: React.FC = () => {
@@ -123,5 +112,7 @@ const App: React.FC = () => {
     </Router>
   );
 };
+
+
 
 export default App;

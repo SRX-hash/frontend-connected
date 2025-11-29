@@ -1,25 +1,36 @@
-
 import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth, UserRole } from './AuthContext';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from './AuthContext';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRole?: UserRole;
+  allowedRole?: 'admin' | 'manufacturer' | 'buyer'; // Add role support
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRole }) => {
-  const { user, isAuthenticated } = useAuth();
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  allowedRole
+}) => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-neutral-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
+    );
   }
 
-  if (allowedRole && user?.role !== allowedRole) {
-    // If user is logged in but wrong role, redirect to their appropriate dashboard or home
-    if (user?.role === 'buyer') return <Navigate to="/search" replace />;
-    if (user?.role === 'manufacturer') return <Navigate to="/manufacturer-dashboard" replace />;
-    if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  // 1. Check if Logged In
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // 2. Check if Role Matches (The New Security Barrier)
+  if (allowedRole && user.role !== allowedRole) {
+    // If a Buyer tries to hit Admin, kick them to Home (or Search)
     return <Navigate to="/" replace />;
   }
 

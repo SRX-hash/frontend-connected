@@ -69,12 +69,12 @@ export const SearchPage: React.FC = () => {
           const result = await response.json();
 
           if (page === 1) {
-            setFabrics(result.data);
+            setFabrics(result.results || []);
           } else {
-            setFabrics(prev => [...prev, ...result.data]);
+            setFabrics(prev => [...prev, ...(result.results || [])]);
           }
 
-          setHasMore(result.has_more);
+          setHasMore(page < result.pages);
           setTotalResults(result.total);
         } else {
           console.error('Failed to fetch fabrics');

@@ -500,17 +500,26 @@ def signup():
     data = request.json
     email = data.get('email')
     password = data.get('password')
-    # Security: Hardcode role to prevent privilege escalation (mass assignment attack)
-    # Admin users must be created through a separate, controlled process
-    role = 'buyer'
+    requested_role = data.get('role', 'buyer')
     company_name = data.get('company_name', '')
-    if not email or not password: return jsonify({"msg": "Email and password required"}), 400
-    if User.query.filter_by(email=email).first(): return jsonify({"msg": "Email already exists"}), 400
+    
+    # Security: Only allow 'buyer' or 'manufacturer' roles during signup
+    # Admin users must be created through CLI command: flask --app api_server create-admin
+    if requested_role not in ['buyer', 'manufacturer']:
+        role = 'buyer'  # Default to buyer for invalid/admin role attempts
+    else:
+        role = requested_role
+    
+    if not email or not password: 
+        return jsonify({"msg": "Email and password required"}), 400
+    if User.query.filter_by(email=email).first(): 
+        return jsonify({"msg": "Email already exists"}), 400
+    
     hashed_password = generate_password_hash(password)
     new_user = User(email=email, password_hash=hashed_password, role=role, company_name=company_name)
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({"message": "User created successfully", "user_id": new_user.id}), 201
+    return jsonify({"message": "User created successfully", "user_id": new_user.id, "role": role}), 201
 
 @app.route('/api/auth/login', methods=['POST'])
 @limiter.limit("10 per minute")

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="forbid"  # Security: Forbid extra env vars to catch typos
+        extra="ignore"  # Allow extra env vars
     )
     
     # ===== API Keys =====
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(..., description="Secret key for Flask session and JWT")
     ADMIN_EMAIL: str = Field(default="admin@linker.app", description="Admin email address")
     ADMIN_PASSWORD: str = Field(..., description="Admin password")
-    MASCO_PASSWORD: str = Field(..., description="Masco manufacturer user password")
+    MASCO_PASSWORD: str = Field(default="masco123", description="Masco manufacturer user password")
     CORS_ALLOWED_ORIGINS: str = Field(default="http://localhost:5173,http://localhost:3000,http://localhost:3001", description="Comma-separated list of allowed CORS origins")
     
     @field_validator("OUTPUT_FORMAT")

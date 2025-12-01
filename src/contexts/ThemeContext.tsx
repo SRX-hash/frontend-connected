@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 type Theme = 'light' | 'dark';
 
@@ -10,6 +11,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
   const [theme, setTheme] = useState<Theme>(() => {
     // Check localStorage first, then default to 'dark'
     const savedTheme = localStorage.getItem('theme') as Theme;
@@ -24,7 +26,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.classList.remove('dark');
     }
     localStorage.setItem('theme', theme);
-  }, [theme]);
+  }, [theme, location]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
